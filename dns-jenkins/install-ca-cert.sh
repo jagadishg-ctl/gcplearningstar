@@ -26,7 +26,7 @@ echo "After copying the certificates, run:"
 echo "  sudo update-ca-trust extract"
 echo ""
 echo "Then test with:"
-echo "  curl https://jenkins.np.dreamcompany.intranet"
+echo "  curl https://jenkins.gcphome.store"
 
 # If certificates are provided as arguments, copy them
 if [ $# -gt 0 ]; then
@@ -44,5 +44,5 @@ if [ $# -gt 0 ]; then
     
     echo "CA certificates installed successfully!"
     echo "Testing connection..."
-    curl -I https://jenkins.np.dreamcompany.intranet || echo "Connection test failed"
+    curl -I https://jenkins.gcphome.store || echo "Connection test failed"
 fi

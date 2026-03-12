@@ -8,7 +8,7 @@ This Terraform configuration creates a Windows Server 2022 VM in the same VPC an
 - **Name**: `windows-test-server`
 - **OS**: Windows Server 2022 Datacenter
 - **Machine Type**: e2-standard-2 (2 vCPUs, 8 GB RAM)
-- **Network**: vpc-spoke
+- **Network**: vpc-jenkins-private
 - **Subnet**: subnet-jenkins
 - **Access**: Via IAP (no external IP)
 
@@ -137,7 +137,7 @@ Jenkins Server (port 80)
 
 ## Network Details
 
-- **VPC**: vpc-spoke
+- **VPC**: vpc-jenkins-private
 - **Subnet**: subnet-jenkins (10.10.0.0/16)
 - **No external IP**: Access via IAP only
 - **Same subnet as Jenkins**: Can reach load balancer directly

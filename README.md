@@ -17,6 +17,7 @@ This repository contains a production-ready Jenkins deployment on GCP featuring:
 
 ### Quick Start Guides
 - **[DEPLOYMENT-CHECKLIST.md](DEPLOYMENT-CHECKLIST.md)** - Step-by-step deployment checklist with architecture diagrams
+- **[TERRAFORM-CLOUD-SETUP.md](TERRAFORM-CLOUD-SETUP.md)** - Workspace and variable setup for app.terraform.io
 - **[TROUBLESHOOTING-QUICK-GUIDE.md](TROUBLESHOOTING-QUICK-GUIDE.md)** - Quick fixes for common issues
 - **[COMPLETE-DOCUMENTATION.md](COMPLETE-DOCUMENTATION.md)** - Comprehensive documentation (130+ pages)
 
@@ -38,7 +39,7 @@ External Users → VPN Gateway (Hub VPC)
                       ↓
             Spoke VPC (10.10.0.0/16)
                       ↓
-    DNS: jenkins.np.dreamcompany.intranet
+    DNS: jenkins.gcphome.store
                       ↓
     Internal HTTPS LB (10.10.10.50:443)
                       ↓
@@ -73,7 +74,7 @@ gcloud config set project core-it-infra-prod
 mkdir -p cert && cd cert
 openssl genrsa -out jenkins.key 2048
 openssl req -new -x509 -key jenkins.key -out fullchain.pem -days 365 \
-  -subj "/C=US/ST=State/L=City/O=Organization/CN=jenkins.np.dreamcompany.intranet"
+  -subj "/C=US/ST=State/L=City/O=Organization/CN=jenkins.gcphome.store"
 openssl req -new -x509 -key jenkins.key -out root-ca.crt -days 365 \
   -subj "/C=US/ST=State/L=City/O=Organization/CN=Root CA"
 cd ..
@@ -107,48 +108,53 @@ cd Networkingglobal && terraform init && terraform apply -auto-approve && cd ..
 # 2. Deploy Spoke VPC
 cd core-it-infrastructure && terraform init && terraform apply -auto-approve && cd ..
 
-# 3. Configure VPC Peering
-gcloud compute networks peerings create spoke-to-hub \
-  --network=vpc-spoke --peer-network=vpc-hub \
-  --peer-project=networkingglobal-prod --project=core-it-infra-prod
-
-gcloud compute networks peerings create hub-to-spoke \
-  --network=vpc-hub --peer-network=vpc-spoke \
-  --peer-project=core-it-infra-prod --project=networkingglobal-prod
-
-# 4. Create Proxy-Only Subnet
-gcloud compute networks subnets create proxy-only-subnet \
-  --purpose=REGIONAL_MANAGED_PROXY --role=ACTIVE \
-  --region=us-central1 --network=vpc-spoke \
-  --range=10.129.0.0/23 --project=core-it-infra-prod
-
-# 5. Deploy Jenkins VM
+# 3. Deploy Jenkins VM
 cd jenkins-vm && terraform init && terraform apply -auto-approve && cd ..
 
 # Wait 10 minutes for Jenkins installation
 sleep 600
 
-# 6. Configure Firewall for Load Balancer
-gcloud compute firewall-rules create allow-ilb-to-jenkins \
-  --network=vpc-spoke --action=allow --direction=ingress \
-  --source-ranges=10.129.0.0/23,35.191.0.0/16,130.211.0.0/22 \
-  --target-tags=jenkins-server --rules=tcp:8080,tcp:80 \
-  --project=core-it-infra-prod
-
-# 7. Deploy Load Balancer
+# 4. Deploy Load Balancer
 cd jenkins-ilb && terraform init && terraform apply -auto-approve && cd ..
 
-# 8. Deploy DNS
+# 5. Deploy Private DNS (optional if you only use ILB IP)
 cd dns-jenkins && terraform init && terraform apply -auto-approve && cd ..
 
 # Wait for DNS propagation
 sleep 300
 
 echo "✅ Deployment complete!"
-echo "Access Jenkins at: https://jenkins.np.dreamcompany.intranet"
+echo "Access Jenkins at: https://jenkins.gcphome.store"
 ```
 
-**Total deployment time**: ~40-50 minutes
+Notes:
+- This POC is non-HA by design (single Jenkins server).
+- DNS forwarder has been removed; private Cloud DNS is created via `dns-jenkins`.
+
+**Total deployment time**: ~35-45 minutes
+
+## GitHub Deployment (Terraform)
+
+Use workflow `.github/workflows/terraform-poc.yml` with manual trigger (`workflow_dispatch`).
+
+Required GitHub repository secrets:
+- `GCP_SA_KEY` (service account JSON key)
+- `GCP_BILLING_ACCOUNT_ID`
+- `JENKINS_SSL_PRIVATE_KEY` (PEM private key)
+- `JENKINS_SSL_CERTIFICATE` (PEM certificate chain)
+
+Required GitHub repository variables:
+- `NETWORKINGGLOBAL_MANAGEMENT_PROJECT_ID`
+- `NETWORKINGGLOBAL_PROJECT_ID`
+- `CORE_IT_INFRA_PROJECT_ID`
+
+Optional GitHub repository variables (defaults used if omitted):
+- `GCP_REGION` (default: `us-central1`)
+- `GCP_ZONE` (default: `us-central1-a`)
+
+Workflow options:
+- `plan` for dry-run validation
+- `apply` for actual deployment
 
 ## 🔑 Access Jenkins
 
@@ -164,7 +170,7 @@ gcloud compute ssh jenkins-server --zone=us-central1-a \
 ### Method 2: Via Load Balancer (From VPC)
 ```bash
 # From Windows test VM or any VM in VPC
-https://jenkins.np.dreamcompany.intranet
+https://jenkins.gcphome.store
 # Or: https://10.10.10.50
 ```
 
@@ -257,7 +263,7 @@ gcloud compute backend-services get-health jenkins-backend-service \
 echo "DNS:"
 gcloud compute ssh jenkins-server --zone=us-central1-a \
   --project=core-it-infra-prod --tunnel-through-iap \
-  --command='nslookup jenkins.np.dreamcompany.intranet' | grep Address
+  --command='nslookup jenkins.gcphome.store' | grep Address
 ```
 
 Expected output:
@@ -353,7 +359,7 @@ gcloud dns record-sets list --zone=jenkins-private-zone \
 # Clear cache and test
 gcloud compute ssh jenkins-server --zone=us-central1-a \
   --project=core-it-infra-prod --tunnel-through-iap \
-  --command='sudo systemd-resolve --flush-caches && nslookup jenkins.np.dreamcompany.intranet'
+  --command='sudo systemd-resolve --flush-caches && nslookup jenkins.gcphome.store'
 ```
 
 **For detailed troubleshooting**: See [TROUBLESHOOTING-QUICK-GUIDE.md](TROUBLESHOOTING-QUICK-GUIDE.md)
@@ -389,20 +395,6 @@ cd jenkins-ilb && terraform destroy -auto-approve && cd ..
 cd jenkins-vm && terraform destroy -auto-approve && cd ..
 cd core-it-infrastructure && terraform destroy -auto-approve && cd ..
 cd Networkingglobal && terraform destroy -auto-approve && cd ..
-
-# Delete VPC peering
-gcloud compute networks peerings delete spoke-to-hub \
-  --network=vpc-spoke --project=core-it-infra-prod
-gcloud compute networks peerings delete hub-to-spoke \
-  --network=vpc-hub --project=networkingglobal-prod
-
-# Delete proxy subnet
-gcloud compute networks subnets delete proxy-only-subnet \
-  --region=us-central1 --project=core-it-infra-prod
-
-# Delete firewall rules (if created manually)
-gcloud compute firewall-rules delete allow-ilb-to-jenkins \
-  --project=core-it-infra-prod
 ```
 
 ## 📋 Features
@@ -417,7 +409,7 @@ gcloud compute firewall-rules delete allow-ilb-to-jenkins \
 
 ### Scalability
 - ✅ Hub-spoke network architecture
-- ✅ Load balancer ready for multiple backends
+- ✅ Single-backend design for POC (can be extended later)
 - ✅ Separate data disk for easy scaling
 - ✅ Regional deployment
 
@@ -473,7 +465,7 @@ This POC uses self-signed SSL certificates for testing. For production:
 - Set up Cloud Monitoring with alerts
 - Enable VPC Flow Logs
 - Implement automated backups
-- Deploy multi-region for HA
+- Add multi-region only if HA is required later
 - Use Cloud NAT for outbound internet
 - Implement disaster recovery plan
 
@@ -518,7 +510,7 @@ gcloud compute ssh jenkins-server --zone=us-central1-a --project=core-it-infra-p
 gcloud compute disks snapshot jenkins-data-disk --zone=us-central1-a --project=core-it-infra-prod --snapshot-names=backup-$(date +%Y%m%d)
 
 # Test DNS
-gcloud compute ssh jenkins-server --zone=us-central1-a --project=core-it-infra-prod --tunnel-through-iap --command='nslookup jenkins.np.dreamcompany.intranet'
+gcloud compute ssh jenkins-server --zone=us-central1-a --project=core-it-infra-prod --tunnel-through-iap --command='nslookup jenkins.gcphome.store'
 ```
 
 ---

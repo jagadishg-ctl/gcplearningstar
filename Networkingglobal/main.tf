@@ -44,10 +44,10 @@ resource "google_project_service" "compute_api" {
   disable_on_destroy = false
 }
 
-# Create the VPC network named "vpc-hub"
+# Create the VPC network named "vpc-networkingbackend"
 resource "google_compute_network" "vpc_hub" {
   project                 = google_project.networkingglobal.project_id
-  name                    = "vpc-hub"
+  name                    = "vpc-networkingbackend"
   auto_create_subnetworks = false
   
   depends_on = [google_project_service.compute_api]
@@ -100,9 +100,9 @@ resource "google_compute_firewall" "allow_firezone_udp" {
 
 # VPC Peering from Hub to Spoke
 resource "google_compute_network_peering" "hub_to_spoke" {
-  name         = "vpc-hub-to-vpc-spoke"
+  name         = "vpc-networkingbackend-to-vpc-jenkins-private"
   network      = google_compute_network.vpc_hub.self_link
-  peer_network = "projects/core-it-infra-prod/global/networks/vpc-spoke"
+  peer_network = "projects/core-it-infra-prod/global/networks/vpc-jenkins-private"
   
   export_custom_routes = true
   import_custom_routes = true

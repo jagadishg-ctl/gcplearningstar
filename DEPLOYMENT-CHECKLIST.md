@@ -49,7 +49,7 @@ openssl genrsa -out jenkins.key 2048
 
 # Certificate
 openssl req -new -x509 -key jenkins.key -out fullchain.pem -days 365 \
-  -subj "/C=US/ST=State/L=City/O=Organization/CN=jenkins.np.dreamcompany.intranet"
+  -subj "/C=US/ST=State/L=City/O=Organization/CN=jenkins.gcphome.store"
 
 # Root CA
 openssl req -new -x509 -key jenkins.key -out root-ca.crt -days 365 \
@@ -92,39 +92,18 @@ cd ..
 - [ ] Subnet-jenkins created
 - [ ] Firewall rules in place
 
-**1.3 Configure VPC Peering**
+**1.3 Validate Terraform-Created Network Dependencies**
 ```bash
-# Spoke to Hub
-gcloud compute networks peerings create spoke-to-hub \
-  --network=vpc-spoke --peer-network=vpc-hub \
-  --peer-project=networkingglobal-prod \
+# Verify peering exists (created by Terraform in hub/spoke stacks)
+gcloud compute networks peerings list --network=vpc-jenkins-private \
   --project=core-it-infra-prod
 
-# Hub to Spoke
-gcloud compute networks peerings create hub-to-spoke \
-  --network=vpc-hub --peer-network=vpc-spoke \
-  --peer-project=core-it-infra-prod \
-  --project=networkingglobal-prod
-
-# Verify
-gcloud compute networks peerings list --network=vpc-spoke \
-  --project=core-it-infra-prod
-```
-- [ ] Peering created
-- [ ] Status: ACTIVE
-
-**1.4 Create Proxy-Only Subnet (Required for ILB)**
-```bash
-gcloud compute networks subnets create proxy-only-subnet \
-  --purpose=REGIONAL_MANAGED_PROXY --role=ACTIVE \
-  --region=us-central1 --network=vpc-spoke \
-  --range=10.129.0.0/23 --project=core-it-infra-prod
-
-# Verify
+# Verify proxy-only subnet exists (created by Terraform in spoke stack)
 gcloud compute networks subnets describe proxy-only-subnet \
   --region=us-central1 --project=core-it-infra-prod
 ```
-- [ ] Proxy-only subnet created
+- [ ] Peering status: ACTIVE
+- [ ] Proxy-only subnet exists
 
 ---
 
@@ -175,18 +154,12 @@ gcloud compute ssh jenkins-server --zone=us-central1-a \
 
 #### Phase 3: Load Balancer (10-15 minutes)
 
-**3.1 Configure Firewall for Load Balancer**
-```bash
-# Health checks and proxy traffic
-gcloud compute firewall-rules create allow-ilb-to-jenkins \
-  --network=vpc-spoke --action=allow --direction=ingress \
-  --source-ranges=10.129.0.0/23,35.191.0.0/16,130.211.0.0/22 \
-  --target-tags=jenkins-server --rules=tcp:8080,tcp:80 \
-  --project=core-it-infra-prod
-```
-- [ ] Firewall rule created
+**3.1 Firewall Rules**
+Firewall rules for ILB proxy traffic and health checks are created by Terraform.
+- [ ] ILB proxy traffic firewall rule present
+- [ ] Health-check firewall rule present
 
-**3.2 Deploy Internal HTTPS Load Balancer**
+**3.2 Deploy Internal HTTPS Load Balancer (single backend, non-HA)**
 ```bash
 cd jenkins-ilb
 
@@ -228,7 +201,7 @@ gcloud compute ssh jenkins-server --zone=us-central1-a \
 
 ---
 
-#### Phase 4: DNS Configuration (5 minutes)
+#### Phase 4: DNS Configuration (No DNS Forwarder, 5 minutes)
 
 **4.1 Deploy Private DNS Zone**
 ```bash
@@ -345,8 +318,8 @@ gcloud compute ssh jenkins-server --zone=us-central1-a \
 ### ✅ Component Checklist
 
 - [ ] **Network Layer**
-  - [ ] VPC-hub exists
-  - [ ] VPC-spoke exists  
+  - [ ] VPC-networkingbackend exists
+  - [ ] VPC-jenkins-private exists  
   - [ ] VPC peering active
   - [ ] Proxy-only subnet created
   - [ ] All firewall rules in place
@@ -420,9 +393,9 @@ curl http://localhost:8080
 
 | Component | Value |
 |-----------|-------|
-| Hub VPC | vpc-hub |
+| Hub VPC | vpc-networkingbackend |
 | Hub Subnet | subnet-vpn (20.20.0.0/16) |
-| Spoke VPC | vpc-spoke |
+| Spoke VPC | vpc-jenkins-private |
 | Spoke Subnet | subnet-jenkins (10.10.0.0/16) |
 | Proxy Subnet | 10.129.0.0/23 |
 | IAP Range | 35.235.240.0/20 |
@@ -461,7 +434,7 @@ curl http://localhost:8080
 |-----------|-------|
 | Zone Name | jenkins-private-zone |
 | Domain | dreamcompany.intranet |
-| Visibility | Private (vpc-spoke) |
+| Visibility | Private (vpc-jenkins-private) |
 | A Record | jenkins.np.dreamcompany.intranet |
 | IP Address | 10.10.10.50 |
 | TTL | 300 seconds |
@@ -480,7 +453,7 @@ curl http://localhost:8080
 ╔════════════════════════════════════════════════════════════════════╗
 ║            PROJECT: networkingglobal-prod (Hub)                    ║
 ║  ┌──────────────────────────────────────────────────────────────┐ ║
-║  │  VPC: vpc-hub (20.20.0.0/16)                                 │ ║
+║  │  VPC: vpc-networkingbackend (20.20.0.0/16)                                 │ ║
 ║  │  ┌─────────────────────────────────────────────────────────┐ │ ║
 ║  │  │  Subnet: subnet-vpn (20.20.0.0/16, us-central1)         │ │ ║
 ║  │  │  - Firezone Gateway VM                                   │ │ ║
@@ -496,7 +469,7 @@ curl http://localhost:8080
 ╔════════════════════════════════════════════════════════════════════╗
 ║            PROJECT: core-it-infra-prod (Spoke)                     ║
 ║  ┌──────────────────────────────────────────────────────────────┐ ║
-║  │  VPC: vpc-spoke (10.10.0.0/16)                               │ ║
+║  │  VPC: vpc-jenkins-private (10.10.0.0/16)                               │ ║
 ║  │                                                                │ ║
 ║  │  ┌─────────────────────────────────────────────────────────┐ │ ║
 ║  │  │  Subnet: subnet-jenkins (10.10.0.0/16, us-central1)     │ │ ║
@@ -656,17 +629,15 @@ gcloud compute instances start jenkins-server \
 |-------|------|------|-------|
 | 1 | Hub VPC deployment | 5 min | 5 min |
 | 1 | Spoke VPC deployment | 5 min | 10 min |
-| 1 | VPC peering setup | 2 min | 12 min |
-| 1 | Proxy-only subnet | 1 min | 13 min |
+| 1 | Terraform network validation | 2 min | 12 min |
 | 2 | Jenkins VM deployment | 3 min | 16 min |
 | 2 | Jenkins installation wait | 10 min | 26 min |
-| 3 | Firewall configuration | 2 min | 28 min |
-| 3 | Load balancer deployment | 5 min | 33 min |
-| 3 | Health check stabilization | 3 min | 36 min |
-| 4 | DNS deployment | 3 min | 39 min |
-| 4 | DNS propagation wait | 5 min | 44 min |
+| 3 | Load balancer deployment | 5 min | 30 min |
+| 3 | Health check stabilization | 3 min | 33 min |
+| 4 | DNS deployment | 3 min | 36 min |
+| 4 | DNS propagation wait | 5 min | 41 min |
 | 5 | Windows VM (optional) | 5 min | 49 min |
-| - | **Total Deployment Time** | | **40-50 min** |
+| - | **Total Deployment Time** | | **35-45 min** |
 
 *Note: Times are approximate and may vary based on GCP region load and network conditions*
 

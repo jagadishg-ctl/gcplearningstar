@@ -6,7 +6,7 @@ provider "google" {
 # Data source to reference existing VPC
 data "google_compute_network" "vpc_spoke" {
   project = var.project_id
-  name    = "vpc-spoke"
+  name    = "vpc-jenkins-private"
 }
 
 # Data source to reference existing subnet
@@ -131,6 +131,16 @@ resource "google_compute_instance" "jenkins_vm" {
     # Create Jenkins directory on data disk
     mkdir -p "$MOUNT_POINT/jenkins_home"
     chown -R jenkins:jenkins "$MOUNT_POINT/jenkins_home"
+
+    # Set Jenkins UI display name on first startup
+    mkdir -p "$MOUNT_POINT/jenkins_home/init.groovy.d"
+    cat > "$MOUNT_POINT/jenkins_home/init.groovy.d/01-set-display-name.groovy" <<-GROOVY
+  import jenkins.model.Jenkins
+  def j = Jenkins.get()
+  j.setDisplayName(${jsonencode(var.jenkins_display_name)})
+  j.save()
+  GROOVY
+    chown -R jenkins:jenkins "$MOUNT_POINT/jenkins_home/init.groovy.d"
     
     # Update Jenkins configuration
     sed -i 's|JENKINS_HOME="/var/lib/jenkins"|JENKINS_HOME="'"$MOUNT_POINT"'/jenkins_home"|' /usr/lib/systemd/system/jenkins.service

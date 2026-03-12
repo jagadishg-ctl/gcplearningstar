@@ -137,7 +137,7 @@
 | **A Record** | jenkins.np.dreamcompany.intranet |
 | **IP Address** | 10.10.10.50 |
 | **TTL** | 300 seconds |
-| **Visibility** | vpc-spoke only |
+| **Visibility** | vpc-jenkins-private only |
 
 ## Security Architecture
 

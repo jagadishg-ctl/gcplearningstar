@@ -17,10 +17,10 @@ resource "google_project_service" "compute_api" {
   disable_on_destroy = false
 }
 
-# Create the VPC network named "vpc-spoke"
+# Create the VPC network named "vpc-jenkins-private"
 resource "google_compute_network" "vpc_spoke" {
   project                 = google_project.core_it_infrastructure.project_id
-  name                    = "vpc-spoke"
+  name                    = "vpc-jenkins-private"
   auto_create_subnetworks = false
   
   depends_on = [google_project_service.compute_api]
@@ -101,9 +101,9 @@ resource "google_compute_firewall" "allow_ilb_proxy_traffic" {
 
 # VPC Peering from Spoke to Hub
 resource "google_compute_network_peering" "spoke_to_hub" {
-  name         = "vpc-spoke-to-vpc-hub"
+  name         = "vpc-jenkins-private-to-vpc-networkingbackend"
   network      = google_compute_network.vpc_spoke.self_link
-  peer_network = "projects/networkingglobal-prod/global/networks/vpc-hub"
+  peer_network = "projects/networkingglobal-prod/global/networks/vpc-networkingbackend"
   
   export_custom_routes = true
   import_custom_routes = true

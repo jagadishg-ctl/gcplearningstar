@@ -1,0 +1,5 @@
+# Copy this file to terraform.tfvars for local runs, or pass values via CI variables.
+new_project_id  = "core-it-infra-prod"
+billing_account = "AAAAAA-BBBBBB-CCCCCC"
+region          = "us-central1"
+subnet_cidr     = "10.10.0.0/16"

@@ -100,14 +100,14 @@ gcloud compute firewall-rules list --filter="name~health" --project=core-it-infr
 
 # 2. If missing, create:
 gcloud compute firewall-rules create allow-health-checks \
-  --network=vpc-spoke --action=allow --direction=ingress \
+  --network=vpc-jenkins-private --action=allow --direction=ingress \
   --source-ranges=35.191.0.0/16,130.211.0.0/22 \
   --target-tags=jenkins-server --rules=tcp:8080 \
   --project=core-it-infra-prod
 
 # 3. Allow proxy subnet
 gcloud compute firewall-rules create allow-proxy-to-jenkins \
-  --network=vpc-spoke --action=allow --direction=ingress \
+  --network=vpc-jenkins-private --action=allow --direction=ingress \
   --source-ranges=10.129.0.0/23 --target-tags=jenkins-server \
   --rules=tcp:8080,tcp:80 --project=core-it-infra-prod
 
@@ -168,7 +168,7 @@ gcloud compute firewall-rules describe allow-iap-ssh --project=core-it-infra-pro
 
 # 4. If missing, create:
 gcloud compute firewall-rules create allow-iap-ssh \
-  --network=vpc-spoke --action=allow --direction=ingress \
+  --network=vpc-jenkins-private --action=allow --direction=ingress \
   --source-ranges=35.235.240.0/20 --rules=tcp:22 \
   --project=core-it-infra-prod
 
@@ -313,7 +313,7 @@ gcloud projects add-iam-policy-binding core-it-infra-prod \
 
 # 3. Check firewall allows IAP
 gcloud compute firewall-rules create allow-iap-ssh \
-  --network=vpc-spoke --action=allow --direction=ingress \
+  --network=vpc-jenkins-private --action=allow --direction=ingress \
   --source-ranges=35.235.240.0/20 --rules=tcp:22,tcp:3389 \
   --project=core-it-infra-prod
 

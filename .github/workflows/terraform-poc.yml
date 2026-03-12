@@ -1,0 +1,127 @@
+name: Terraform POC Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action to run
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: true
+      TF_ACTION: ${{ github.event.inputs.action }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ZONE: ${{ vars.GCP_ZONE }}
+      NETWORKINGGLOBAL_MANAGEMENT_PROJECT_ID: ${{ vars.NETWORKINGGLOBAL_MANAGEMENT_PROJECT_ID }}
+      NETWORKINGGLOBAL_PROJECT_ID: ${{ vars.NETWORKINGGLOBAL_PROJECT_ID }}
+      CORE_IT_INFRA_PROJECT_ID: ${{ vars.CORE_IT_INFRA_PROJECT_ID }}
+      GCP_BILLING_ACCOUNT_ID: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
+      TF_VAR_ssl_private_key: ${{ secrets.JENKINS_SSL_PRIVATE_KEY }}
+      TF_VAR_ssl_certificate: ${{ secrets.JENKINS_SSL_CERTIFICATE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Validate Required Inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required=(
+            NETWORKINGGLOBAL_MANAGEMENT_PROJECT_ID
+            NETWORKINGGLOBAL_PROJECT_ID
+            CORE_IT_INFRA_PROJECT_ID
+            GCP_BILLING_ACCOUNT_ID
+            TF_VAR_ssl_private_key
+            TF_VAR_ssl_certificate
+          )
+
+          for name in "${required[@]}"; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub variable/secret: $name"
+              exit 1
+            fi
+          done
+
+          if [ -z "${GCP_REGION:-}" ]; then
+            echo "GCP_REGION not set, defaulting to us-central1"
+            echo "GCP_REGION=us-central1" >> "$GITHUB_ENV"
+          fi
+
+          if [ -z "${GCP_ZONE:-}" ]; then
+            echo "GCP_ZONE not set, defaulting to us-central1-a"
+            echo "GCP_ZONE=us-central1-a" >> "$GITHUB_ENV"
+          fi
+
+      - name: Terraform Plan/Apply (Ordered)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          run_module() {
+            local module="$1"
+            shift
+            local args=("$@")
+
+            echo "=== $module: init ==="
+            terraform -chdir="$module" init -input=false
+
+            echo "=== $module: validate ==="
+            terraform -chdir="$module" validate
+
+            echo "=== $module: plan ==="
+            terraform -chdir="$module" plan -input=false -out=tfplan "${args[@]}"
+
+            if [ "$TF_ACTION" = "apply" ]; then
+              echo "=== $module: apply ==="
+              terraform -chdir="$module" apply -input=false -auto-approve tfplan
+            fi
+          }
+
+          run_module "Networkingglobal" \
+            -var "project_id=${NETWORKINGGLOBAL_MANAGEMENT_PROJECT_ID}" \
+            -var "new_project_id=${NETWORKINGGLOBAL_PROJECT_ID}" \
+            -var "billing_account=${GCP_BILLING_ACCOUNT_ID}" \
+            -var "region=${GCP_REGION}"
+
+          run_module "core-it-infrastructure" \
+            -var "new_project_id=${CORE_IT_INFRA_PROJECT_ID}" \
+            -var "billing_account=${GCP_BILLING_ACCOUNT_ID}" \
+            -var "region=${GCP_REGION}"
+
+          run_module "jenkins-vm" \
+            -var "project_id=${CORE_IT_INFRA_PROJECT_ID}" \
+            -var "region=${GCP_REGION}" \
+            -var "zone=${GCP_ZONE}"
+
+          run_module "jenkins-ilb" \
+            -var "project_id=${CORE_IT_INFRA_PROJECT_ID}" \
+            -var "region=${GCP_REGION}" \
+            -var "zone=${GCP_ZONE}" \
+            -var "jenkins_vm_name=gcp-jenkins"
+
+          run_module "dns-jenkins" \
+            -var "project_id=${CORE_IT_INFRA_PROJECT_ID}" \
+            -var "region=${GCP_REGION}" \
+            -var "jenkins_lb_ip=10.10.10.50"

@@ -14,14 +14,14 @@ resource "google_project_service" "dns_api" {
 # Data source to reference existing VPC
 data "google_compute_network" "vpc_spoke" {
   project = var.project_id
-  name    = "vpc-spoke"
+  name    = "vpc-jenkins-private"
 }
 
 # Create Private DNS Zone for internal domain
 resource "google_dns_managed_zone" "jenkins_private_zone" {
   project     = var.project_id
   name        = "jenkins-private-zone"
-  dns_name    = "dreamcompany.intranet."
+  dns_name    = var.dns_zone_name
   description = "Private DNS zone for internal Jenkins access"
   visibility  = "private"
   
@@ -37,7 +37,7 @@ resource "google_dns_managed_zone" "jenkins_private_zone" {
 # Create A record for Jenkins hostname pointing to Load Balancer IP
 resource "google_dns_record_set" "jenkins_a_record" {
   project      = var.project_id
-  name         = "jenkins.np.${google_dns_managed_zone.jenkins_private_zone.dns_name}"
+  name         = "${var.jenkins_host_label}.${google_dns_managed_zone.jenkins_private_zone.dns_name}"
   managed_zone = google_dns_managed_zone.jenkins_private_zone.name
   type         = "A"
   ttl          = 300
@@ -48,10 +48,10 @@ resource "google_dns_record_set" "jenkins_a_record" {
 # Optional: Create CNAME for www if needed
 resource "google_dns_record_set" "jenkins_cname" {
   project      = var.project_id
-  name         = "www.jenkins.np.${google_dns_managed_zone.jenkins_private_zone.dns_name}"
+  name         = "www.${var.jenkins_host_label}.${google_dns_managed_zone.jenkins_private_zone.dns_name}"
   managed_zone = google_dns_managed_zone.jenkins_private_zone.name
   type         = "CNAME"
   ttl          = 300
   
-  rrdatas = ["jenkins.np.${google_dns_managed_zone.jenkins_private_zone.dns_name}"]
+  rrdatas = ["${var.jenkins_host_label}.${google_dns_managed_zone.jenkins_private_zone.dns_name}"]
 }

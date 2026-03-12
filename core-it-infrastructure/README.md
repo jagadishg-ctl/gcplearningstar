@@ -5,7 +5,7 @@ Terraform configuration for core-it-infrastructure GCP VPC Spoke deployment.
 ## Resources
 
 - **Project**: core-it-infrastructure
-- **VPC**: vpc-spoke
+- **VPC**: vpc-jenkins-private
 - **Subnet**: subnet-jenkins (10.10.0.0/16) in us-central1
 - **Firewall**: IAP SSH access (TCP:22 from 35.235.240.0/20)
 - **Firewall**: Hub traffic (TCP:443 from 20.20.0.0/16)

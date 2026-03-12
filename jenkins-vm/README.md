@@ -5,18 +5,19 @@ This Terraform configuration creates a Jenkins VM with Rocky Linux in the existi
 ## Prerequisites
 
 - The `core-it-infrastructure` project must already be created
-- The `vpc-spoke` VPC network must exist
+- The `vpc-jenkins-private` VPC network must exist
 - The `subnet-jenkins` subnet must exist
 
 ## VM Specifications
 
-- **Name**: jenkins-server
+- **Name**: gcp-jenkins
+- **Jenkins Display Name**: GCP-Jenkins
 - **OS**: Rocky Linux 9
 - **Machine Type**: e2-standard-2
 - **Zone**: us-central1-a
 - **Boot Disk**: 20 GB (pd-standard)
 - **Data Disk**: 20 GB (pd-standard, mounted at `/jenkins`)
-- **Network**: Connected to existing `vpc-spoke` and `subnet-jenkins`
+- **Network**: Connected to existing `vpc-jenkins-private` and `subnet-jenkins`
 
 ## Deployment
 
@@ -46,7 +47,7 @@ terraform output jenkins_vm_internal_ip
 
 ### SSH to VM
 ```bash
-gcloud compute ssh jenkins-server \
+gcloud compute ssh gcp-jenkins \
   --project=core-it-infra-prod \
   --zone=us-central1-a \
   --tunnel-through-iap
@@ -120,14 +121,14 @@ data_disk_size = 50
 
 ### Check VM Status
 ```bash
-gcloud compute instances describe jenkins-server \
+gcloud compute instances describe gcp-jenkins \
   --project=core-it-infra-prod \
   --zone=us-central1-a
 ```
 
 ### View Startup Script Logs
 ```bash
-gcloud compute ssh jenkins-server \
+gcloud compute ssh gcp-jenkins \
   --project=core-it-infra-prod \
   --zone=us-central1-a \
   --tunnel-through-iap \
@@ -136,7 +137,7 @@ gcloud compute ssh jenkins-server \
 
 ### Check Jenkins Service Status
 ```bash
-gcloud compute ssh jenkins-server \
+gcloud compute ssh gcp-jenkins \
   --project=core-it-infra-prod \
   --zone=us-central1-a \
   --tunnel-through-iap \
@@ -145,7 +146,7 @@ gcloud compute ssh jenkins-server \
 
 ### Verify Data Disk Mount
 ```bash
-gcloud compute ssh jenkins-server \
+gcloud compute ssh gcp-jenkins \
   --project=core-it-infra-prod \
   --zone=us-central1-a \
   --tunnel-through-iap \

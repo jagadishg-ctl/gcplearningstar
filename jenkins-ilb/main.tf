@@ -6,7 +6,7 @@ provider "google" {
 # Data source to reference existing VPC
 data "google_compute_network" "vpc_spoke" {
   project = var.project_id
-  name    = "vpc-spoke"
+  name    = "vpc-jenkins-private"
 }
 
 # Data source to reference existing subnet
@@ -19,7 +19,7 @@ data "google_compute_subnetwork" "subnet_jenkins" {
 # Data source to reference existing Jenkins VM instance
 data "google_compute_instance" "jenkins_server" {
   project = var.project_id
-  name    = "jenkins-server"
+  name    = var.jenkins_vm_name
   zone    = var.zone
 }
 
@@ -77,8 +77,8 @@ resource "google_compute_region_ssl_certificate" "jenkins_ssl_cert" {
   project     = var.project_id
   region      = var.region
   name_prefix = "jenkins-ssl-certificate-"
-  private_key = file("${path.module}/../cert/jenkins.key")
-  certificate = file("${path.module}/../cert/fullchain.pem")
+  private_key = var.ssl_private_key
+  certificate = var.ssl_certificate
   
   lifecycle {
     create_before_destroy = true

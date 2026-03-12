@@ -6,17 +6,17 @@ This Terraform configuration creates a private Cloud DNS zone for internal Jenki
 
 ### 1. Private DNS Zone
 - **Name**: `jenkins-private-zone`
-- **Domain**: `dreamcompany.intranet`
+- **Domain**: `gcphome.store`
 - **Visibility**: Private (accessible only from VPC)
-- **Network**: `vpc-spoke`
+- **Network**: `vpc-jenkins-private`
 
 ### 2. DNS Records
-- **A Record**: `jenkins.np.dreamcompany.intranet` → `10.10.10.50`
-- **CNAME Record**: `www.jenkins.np.dreamcompany.intranet` → `jenkins.np.dreamcompany.intranet`
+- **A Record**: `jenkins.gcphome.store` → `10.10.10.50`
+- **CNAME Record**: `www.jenkins.gcphome.store` → `jenkins.gcphome.store`
 
 ## Prerequisites
 
-1. VPC `vpc-spoke` must exist
+1. VPC `vpc-jenkins-private` must exist
 2. Jenkins Internal Load Balancer must be deployed with IP `10.10.10.50`
 3. Cloud DNS API must be enabled in the project
 
@@ -44,16 +44,16 @@ After deployment, you can access Jenkins using the hostname:
 
 ```bash
 # From any VM in the VPC or peered networks
-curl https://jenkins.np.dreamcompany.intranet
+curl https://jenkins.gcphome.store
 
 # Or in a browser
-https://jenkins.np.dreamcompany.intranet
+https://jenkins.gcphome.store
 ```
 
 ## DNS Resolution
 
 The private DNS zone is automatically used by:
-- All VMs in the `vpc-spoke` network
+- All VMs in the `vpc-jenkins-private` network
 - VMs in peered networks (if DNS peering is configured)
 - Resources using the VPC's DNS resolver
 
@@ -62,30 +62,30 @@ The private DNS zone is automatically used by:
 Test DNS resolution from a VM in the VPC:
 
 ```bash
-# SSH to any VM in vpc-spoke (e.g., jenkins-server)
+# SSH to any VM in vpc-jenkins-private (e.g., jenkins-server)
 gcloud compute ssh jenkins-server --project core-it-infra-prod --zone us-central1-a --tunnel-through-iap
 
 # Test DNS resolution
-nslookup jenkins.np.dreamcompany.intranet
-dig jenkins.np.dreamcompany.intranet
+nslookup jenkins.gcphome.store
+dig jenkins.gcphome.store
 
 # Test HTTPS access
-curl https://jenkins.np.dreamcompany.intranet
+curl https://jenkins.gcphome.store
 ```
 
 Expected DNS response:
 ```
-jenkins.np.dreamcompany.intranet. 300 IN A 10.10.10.50
+jenkins.gcphome.store. 300 IN A 10.10.10.50
 ```
 
 ## Architecture
 
 ```
-VMs in vpc-spoke
+VMs in vpc-jenkins-private
      ↓ (DNS Query)
-Cloud DNS Private Zone (dreamcompany.intranet)
+Cloud DNS Private Zone (gcphome.store)
      ↓ (Returns)
-jenkins.np.dreamcompany.intranet → 10.10.10.50
+jenkins.gcphome.store → 10.10.10.50
      ↓ (HTTPS Request)
 Internal Load Balancer (10.10.10.50:443)
      ↓
@@ -96,7 +96,7 @@ Jenkins Server
 
 - This is a **Private DNS Zone** - only accessible from within the VPC
 - DNS records have a TTL of 300 seconds (5 minutes)
-- The SSL certificate should match the hostname `jenkins.np.dreamcompany.intranet`
+- The SSL certificate should match the hostname `jenkins.gcphome.store`
 - If accessing from peered networks, ensure DNS peering is enabled
 
 ## Troubleshooting
@@ -110,7 +110,7 @@ If DNS is not resolving:
 
 2. **Verify DNS zone visibility**:
    - Ensure the zone is associated with the correct VPC
-   - Check that the VM is in the `vpc-spoke` network
+   - Check that the VM is in the `vpc-jenkins-private` network
 
 3. **Test from Jenkins server**:
    ```bash
@@ -118,7 +118,7 @@ If DNS is not resolving:
    sudo systemd-resolve --flush-caches
    
    # Test resolution
-   dig jenkins.np.dreamcompany.intranet
+   dig jenkins.gcphome.store
    ```
 
 4. **Check firewall rules**:

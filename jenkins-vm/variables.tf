@@ -20,7 +20,13 @@ variable "region" {
 variable "vm_name" {
   type        = string
   description = "Name of the VM instance"
-  default     = "jenkins-server"
+  default     = "gcp-jenkins"
+}
+
+variable "jenkins_display_name" {
+  type        = string
+  description = "Display name shown in Jenkins UI"
+  default     = "GCP-Jenkins"
 }
 
 variable "machine_type" {

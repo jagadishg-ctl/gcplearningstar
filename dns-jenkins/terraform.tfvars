@@ -1,3 +1,5 @@
 project_id    = "core-it-infra-prod"
 region        = "us-central1"
 jenkins_lb_ip = "10.10.10.50"
+dns_zone_name = "gcphome.store."
+jenkins_host_label = "jenkins"

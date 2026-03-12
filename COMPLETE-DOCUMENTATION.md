@@ -42,7 +42,7 @@ This POC demonstrates a secure, production-ready Jenkins infrastructure on Googl
 │                    networkingglobal-prod                         │
 │                         (Hub VPC)                                │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │  vpc-hub (20.20.0.0/16)                                     │ │
+│  │  vpc-networkingbackend (20.20.0.0/16)                                     │ │
 │  │  ├── subnet-vpn (20.20.0.0/16, us-central1)                │ │
 │  │  ├── Firezone Gateway (VPN for remote access)              │ │
 │  │  └── Firewall: WireGuard (UDP:51820), IAP SSH              │ │
@@ -55,7 +55,7 @@ This POC demonstrates a secure, production-ready Jenkins infrastructure on Googl
 │                    core-it-infra-prod                            │
 │                        (Spoke VPC)                               │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │  vpc-spoke (10.10.0.0/16)                                   │ │
+│  │  vpc-jenkins-private (10.10.0.0/16)                                   │ │
 │  │  ├── subnet-jenkins (10.10.0.0/16, us-central1)            │ │
 │  │  ├── proxy-only subnet (10.129.0.0/23) - for ILB           │ │
 │  │  │                                                           │ │
@@ -89,11 +89,11 @@ External User
     ↓
 VPN Gateway (Firezone) - Optional
     ↓
-vpc-hub (20.20.0.0/16)
+vpc-networkingbackend (20.20.0.0/16)
     ↓
 VPC Peering
     ↓
-vpc-spoke (10.10.0.0/16)
+vpc-jenkins-private (10.10.0.0/16)
     ↓
 DNS Resolution: jenkins.np.dreamcompany.intranet → 10.10.10.50
     ↓
@@ -119,7 +119,7 @@ Jenkins Server (port 8080)
 **Location**: `Networkingglobal/`
 
 **Resources**:
-- VPC: `vpc-hub`
+- VPC: `vpc-networkingbackend`
 - Subnet: `subnet-vpn` (20.20.0.0/16) in us-central1
 - Firewall rules:
   - IAP SSH access (TCP:22 from 35.235.240.0/20)
@@ -133,7 +133,7 @@ Jenkins Server (port 8080)
 
 **Resources**:
 - Project: `core-it-infra-prod`
-- VPC: `vpc-spoke`
+- VPC: `vpc-jenkins-private`
 - Subnet: `subnet-jenkins` (10.10.0.0/16) in us-central1
 - Firewall rules:
   - IAP SSH access (TCP:22)
@@ -213,7 +213,7 @@ Jenkins Server (port 8080)
 **DNS Zone**:
 - Name: `jenkins-private-zone`
 - Domain: `dreamcompany.intranet`
-- Visibility: Private (vpc-spoke only)
+- Visibility: Private (vpc-jenkins-private only)
 
 **DNS Records**:
 - A Record: `jenkins.np.dreamcompany.intranet` → `10.10.10.50`
@@ -230,7 +230,7 @@ Jenkins Server (port 8080)
 
 **Configuration**:
 - Project: networkingglobal-prod
-- VPC: vpc-hub
+- VPC: vpc-networkingbackend
 - Subnet: subnet-vpn
 - Region: us-central1
 
@@ -242,7 +242,7 @@ Jenkins Server (port 8080)
 - Name: `windows-test-server`
 - OS: Windows Server 2022 Datacenter
 - Machine Type: e2-standard-2
-- Network: Same as Jenkins (vpc-spoke, subnet-jenkins)
+- Network: Same as Jenkins (vpc-jenkins-private, subnet-jenkins)
 - Access: RDP via IAP tunnel
 
 **Purpose**: Test DNS resolution and HTTPS access to Jenkins from Windows environment
@@ -330,8 +330,8 @@ cd ..
 ### 5. Network Prerequisites
 
 Before deploying Jenkins infrastructure:
-- Hub VPC (vpc-hub) must exist
-- Spoke VPC (vpc-spoke) must exist
+- Hub VPC (vpc-networkingbackend) must exist
+- Spoke VPC (vpc-jenkins-private) must exist
 - VPC peering must be configured between hub and spoke
 - Subnet for Jenkins must exist
 - Proxy-only subnet for ILB must be configured
@@ -370,7 +370,7 @@ terraform output
 **Verify**:
 ```bash
 gcloud compute networks list --project=networkingglobal-prod
-gcloud compute networks subnets list --network=vpc-hub --project=networkingglobal-prod
+gcloud compute networks subnets list --network=vpc-networkingbackend --project=networkingglobal-prod
 ```
 
 ### Step 2: Deploy Core IT Infrastructure (Spoke VPC)
@@ -391,7 +391,7 @@ terraform output
 **Verify**:
 ```bash
 gcloud compute networks list --project=core-it-infra-prod
-gcloud compute networks subnets list --network=vpc-spoke --project=core-it-infra-prod
+gcloud compute networks subnets list --network=vpc-jenkins-private --project=core-it-infra-prod
 gcloud compute firewall-rules list --project=core-it-infra-prod
 ```
 
@@ -400,22 +400,22 @@ gcloud compute firewall-rules list --project=core-it-infra-prod
 ```bash
 # Create peering from spoke to hub
 gcloud compute networks peerings create spoke-to-hub \
-  --network=vpc-spoke \
-  --peer-network=vpc-hub \
+  --network=vpc-jenkins-private \
+  --peer-network=vpc-networkingbackend \
   --peer-project=networkingglobal-prod \
   --project=core-it-infra-prod
 
 # Create peering from hub to spoke
 gcloud compute networks peerings create hub-to-spoke \
-  --network=vpc-hub \
-  --peer-network=vpc-spoke \
+  --network=vpc-networkingbackend \
+  --peer-network=vpc-jenkins-private \
   --peer-project=core-it-infra-prod \
   --project=networkingglobal-prod
 ```
 
 **Verify Peering**:
 ```bash
-gcloud compute networks peerings list --network=vpc-spoke --project=core-it-infra-prod
+gcloud compute networks peerings list --network=vpc-jenkins-private --project=core-it-infra-prod
 ```
 
 ### Step 4: Create Proxy-Only Subnet for ILB
@@ -425,7 +425,7 @@ gcloud compute networks subnets create proxy-only-subnet \
   --purpose=REGIONAL_MANAGED_PROXY \
   --role=ACTIVE \
   --region=us-central1 \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --range=10.129.0.0/23 \
   --project=core-it-infra-prod
 ```
@@ -487,7 +487,7 @@ gcloud compute ssh jenkins-server \
 ```bash
 # Allow health checks and traffic from proxy subnet to Jenkins
 gcloud compute firewall-rules create allow-ilb-to-jenkins \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --action=allow \
   --direction=ingress \
   --source-ranges=10.129.0.0/23,35.191.0.0/16,130.211.0.0/22 \
@@ -804,7 +804,7 @@ gcloud services enable iap.googleapis.com --project=core-it-infra-prod
 **B. Create/Fix IAP Firewall Rule**:
 ```bash
 gcloud compute firewall-rules create allow-iap-ssh \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --action=allow \
   --direction=ingress \
   --source-ranges=35.235.240.0/20 \
@@ -853,7 +853,7 @@ gcloud compute forwarding-rules describe jenkins-forwarding-rule \
 # Health checks come from these ranges:
 # 35.191.0.0/16 and 130.211.0.0/22
 gcloud compute firewall-rules create allow-health-checks \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --action=allow \
   --direction=ingress \
   --source-ranges=35.191.0.0/16,130.211.0.0/22 \
@@ -865,7 +865,7 @@ gcloud compute firewall-rules create allow-health-checks \
 **B. Firewall Not Allowing Proxy Subnet**:
 ```bash
 gcloud compute firewall-rules create allow-proxy-to-jenkins \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --action=allow \
   --direction=ingress \
   --source-ranges=10.129.0.0/23 \
@@ -914,7 +914,7 @@ gcloud compute networks subnets create proxy-only-subnet \
   --purpose=REGIONAL_MANAGED_PROXY \
   --role=ACTIVE \
   --region=us-central1 \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --range=10.129.0.0/23 \
   --project=core-it-infra-prod
 ```
@@ -997,7 +997,7 @@ gcloud dns managed-zones describe jenkins-private-zone \
   --project=core-it-infra-prod \
   --format="value(privateVisibilityConfig)"
 
-# Should show vpc-spoke
+# Should show vpc-jenkins-private
 ```
 
 **C. Wrong VPC Attached**:
@@ -1065,12 +1065,12 @@ Test-NetConnection 10.10.10.50 -TraceRoute
 ```bash
 # Check firewall rules allow traffic between subnets
 gcloud compute firewall-rules list \
-  --filter="network=vpc-spoke" \
+  --filter="network=vpc-jenkins-private" \
   --project=core-it-infra-prod
 
 # Create rule if missing
 gcloud compute firewall-rules create allow-internal-https \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --action=allow \
   --direction=ingress \
   --source-ranges=10.10.0.0/16 \
@@ -1104,7 +1104,7 @@ gcloud compute instances describe jenkins-server \
   --project=core-it-infra-prod \
   --format="get(networkInterfaces[0].network)"
 
-# Both should show projects/core-it-infra-prod/global/networks/vpc-spoke
+# Both should show projects/core-it-infra-prod/global/networks/vpc-jenkins-private
 ```
 
 #### Issue: VPC Peering Not Working
@@ -1117,11 +1117,11 @@ gcloud compute instances describe jenkins-server \
 ```bash
 # Check peering status
 gcloud compute networks peerings list \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --project=core-it-infra-prod
 
 gcloud compute networks peerings list \
-  --network=vpc-hub \
+  --network=vpc-networkingbackend \
   --project=networkingglobal-prod
 
 # Should show STATE: ACTIVE
@@ -1133,14 +1133,14 @@ gcloud compute networks peerings list \
 ```bash
 # Create bidirectional peering
 gcloud compute networks peerings create spoke-to-hub \
-  --network=vpc-spoke \
-  --peer-network=vpc-hub \
+  --network=vpc-jenkins-private \
+  --peer-network=vpc-networkingbackend \
   --peer-project=networkingglobal-prod \
   --project=core-it-infra-prod
 
 gcloud compute networks peerings create hub-to-spoke \
-  --network=vpc-hub \
-  --peer-network=vpc-spoke \
+  --network=vpc-networkingbackend \
+  --peer-network=vpc-jenkins-private \
   --peer-project=core-it-infra-prod \
   --project=networkingglobal-prod
 ```
@@ -1149,11 +1149,11 @@ gcloud compute networks peerings create hub-to-spoke \
 ```bash
 # Delete and recreate peering
 gcloud compute networks peerings delete spoke-to-hub \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --project=core-it-infra-prod
 
 gcloud compute networks peerings delete hub-to-spoke \
-  --network=vpc-hub \
+  --network=vpc-networkingbackend \
   --project=networkingglobal-prod
 
 # Recreate with correct settings
@@ -1164,12 +1164,12 @@ gcloud compute networks peerings delete hub-to-spoke \
 ```bash
 # Update peering to export custom routes
 gcloud compute networks peerings update spoke-to-hub \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --export-custom-routes \
   --project=core-it-infra-prod
 
 gcloud compute networks peerings update hub-to-spoke \
-  --network=vpc-hub \
+  --network=vpc-networkingbackend \
   --export-custom-routes \
   --project=networkingglobal-prod
 ```
@@ -1620,12 +1620,12 @@ terraform destroy -auto-approve
 ```bash
 # Delete peering from spoke
 gcloud compute networks peerings delete spoke-to-hub \
-  --network=vpc-spoke \
+  --network=vpc-jenkins-private \
   --project=core-it-infra-prod
 
 # Delete peering from hub
 gcloud compute networks peerings delete hub-to-spoke \
-  --network=vpc-hub \
+  --network=vpc-networkingbackend \
   --project=networkingglobal-prod
 ```
 

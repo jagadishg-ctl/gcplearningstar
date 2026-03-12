@@ -6,7 +6,7 @@ provider "google" {
 # Data source to reference existing VPC
 data "google_compute_network" "vpc_spoke" {
   project = var.project_id
-  name    = "vpc-spoke"
+  name    = "vpc-jenkins-private"
 }
 
 # Data source to reference existing subnet

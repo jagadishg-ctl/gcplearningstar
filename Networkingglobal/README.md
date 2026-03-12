@@ -4,7 +4,7 @@ Terraform configuration for Networkingglobal GCP VPC Hub deployment.
 
 ## Resources
 
-- **VPC**: vpc-hub
+- **VPC**: vpc-networkingbackend
 - **Subnet**: subnet-vpn (20.20.0.0/16) in us-central1
 - **Firewall**: IAP SSH access (TCP:22 from 35.235.240.0/20)
 - **Firewall**: WireGuard VPN (UDP:51820)

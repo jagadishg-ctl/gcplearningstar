@@ -1,0 +1,9 @@
+# Non-sensitive ILB settings
+project_id       = "core-it-infra-prod"
+region           = "us-central1"
+zone             = "us-central1-a"
+jenkins_vm_name  = "gcp-jenkins"
+
+# Provide SSL values securely at runtime instead of committing them:
+# TF_VAR_ssl_private_key     = <PEM private key>
+# TF_VAR_ssl_certificate     = <PEM certificate chain>

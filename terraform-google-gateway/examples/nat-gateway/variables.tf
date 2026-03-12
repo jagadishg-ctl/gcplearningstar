@@ -19,7 +19,7 @@ variable "region" {
 variable "replicas" {
   type        = number
   description = "Number of Gateway replicas to deploy in the availability zone."
-  default     = 3
+  default     = 1
 }
 
 variable "machine_type" {
