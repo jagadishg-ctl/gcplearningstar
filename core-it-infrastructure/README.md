@@ -1,6 +1,6 @@
-# core-it-infrastructure - VPC Spoke Infrastructure
+# core-it-infrastructure - VPC Jenkins Private Infrastructure
 
-Terraform configuration for core-it-infrastructure GCP VPC Spoke deployment.
+Terraform configuration for core-it-infrastructure GCP VPC Jenkins Private deployment.
 
 ## Resources
 

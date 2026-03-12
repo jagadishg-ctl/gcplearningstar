@@ -88,7 +88,7 @@ Use the load balancer IP from within the VPC or via VPN/peered networks.
 ## Architecture
 
 ```
-Internet/VPN → VPC Spoke → ILB (10.10.10.50:443) → Backend Service → Instance Group → Jenkins Server (port 80)
+Internet/VPN → VPC Jenkins Private → ILB (10.10.10.50:443) → Backend Service → Instance Group → Jenkins Server (port 80)
                                      ↓
               Health Check (80/login)
 ```

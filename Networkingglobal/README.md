@@ -1,6 +1,6 @@
-# Networkingglobal - VPC Hub Infrastructure
+# Networkingglobal - VPC Networkingbackend Infrastructure
 
-Terraform configuration for Networkingglobal GCP VPC Hub deployment.
+Terraform configuration for Networkingglobal GCP VPC Networkingbackend deployment.
 
 ## Resources
 
